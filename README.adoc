@@ -1,0 +1,82 @@
+= Solana transfer transactions
+
+A reproducer of strange behaviour of transfering some amounts of SOLs
+from one account to another.
+
+== HOWTO
+
+[source,sh]
+----
+# run test validator
+solana-test-validator --reset --ledger /tmp/test
+
+# check balance of the local wallet
+solana balance
+
+# run test with anchor
+anchor test --skip-build --skip-deploy --skip-local-validator
+
+# check balance of the wallets (local and test ones)
+solana balance
+solana balance ${test_account_address}
+----
+
+== Behaviour
+
+The test transfers 1 SOL from the local wallet to the test account,
+then it transfers 890880 lamports from the local wallet to the test account.
+
+The test fails with the following error:
+
+====
+  transfer-reproducer
+test account 11111111111111111111111111111112 balance 1000000000
+feeCalculated 5000 txFee 5000 diff 0
+    ✔ transfer sol (305ms)
+test account 11111111111111111111111111111112 balance 1000890880
+feeCalculated 4980 txFee 5000 diff -20
+    1) strange transfer stuff
+
+
+  1 passing (731ms)
+  1 failing
+
+  1) transfer-reproducer
+       strange transfer stuff:
+
+      AssertionError: expected '895860' to equal '895880'
+      + expected - actual
+
+      -895860
+      +895880
+      
+      at /home/chalda/my-testing/solana-transfer-reproducer/tests/transfer-reproducer.ts:84:58
+      at Generator.next (<anonymous>)
+      at fulfilled (tests/transfer-reproducer.ts:28:58)
+      at processTicksAndRejections (node:internal/process/task_queues:96:5)
+====
+
+The difference on the balance of the test account is 20 lamports.
+It's not clear where it goes.
+When checking the balances of the accounts before and after there is still a difference.
+
+Is it some number precission issue?
+
+[source,sh]
+----
+# before
+solana balance
+500000000 SOL
+# after
+solana balance
+499999998.999099135 SOL
+solana balance 11111111111111111111111111111112
+1.00089088 SOL
+
+# test account balance calculation
+echo '1000000000+890880-1000890880' | bc
+0
+# expected fees for an operation is 5000 lamports
+echo '499999998999099135+5000+1000000000+5000+890880' | bc
+500000000000000015
+----

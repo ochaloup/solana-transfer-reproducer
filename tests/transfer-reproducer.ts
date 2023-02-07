@@ -1,7 +1,12 @@
 import * as anchor from "@project-serum/anchor"
 import { Program } from "@project-serum/anchor"
 import { TransferReproducer } from "../target/types/transfer_reproducer"
-import { SystemProgram, PublicKey, Transaction } from "@solana/web3.js"
+import {
+  SystemProgram,
+  PublicKey,
+  Transaction,
+  LAMPORTS_PER_SOL,
+} from "@solana/web3.js"
 import BN from "bn.js"
 import { expect } from "chai"
 
@@ -15,23 +20,21 @@ describe("transfer-reproducer", () => {
   const program = anchor.workspace
     .TransferReproducer as Program<TransferReproducer>
 
+  const testAccount = PublicKey.unique()
+
   async function getLamports(address?: PublicKey): Promise<BN> {
     address = address || provider.wallet.publicKey
     const num = await provider.connection.getBalance(address)
     return new BN(num.toString())
   }
 
-  it.only("strange transfer stuff", async () => {
+  async function testTransfer(lamportTransfer: number) {
     const beforeLamports = await getLamports()
+    const testAccountBeforeLamports = await getLamports(testAccount)
 
-    // number of lamports for rent exception of 0 bytes
-    // https://docs.rs/solana-program/latest/src/solana_program/rent.rs.html#31
-    const lamportTransfer = 890880
-
-    const somePubkey = PublicKey.unique()
     const ix = SystemProgram.transfer({
       fromPubkey: provider.wallet.publicKey,
-      toPubkey: somePubkey,
+      toPubkey: testAccount,
       lamports: lamportTransfer,
     })
     const recentBlockhash = await provider.connection.getLatestBlockhash()
@@ -42,8 +45,9 @@ describe("transfer-reproducer", () => {
     const signature = await provider.sendAndConfirm(tx)
 
     const afterLamports = await getLamports()
-    const somePubkeyLamports = await getLamports(somePubkey)
-    expect(somePubkeyLamports.toNumber()).eq(lamportTransfer)
+    const testAccountAfterLamports = await getLamports(testAccount)
+    expect(testAccountAfterLamports.toString())
+      .eq(testAccountBeforeLamports.add(new BN(lamportTransfer)).toString())
 
     const txData = await provider.connection.getTransaction(signature, {
       maxSupportedTransactionVersion: 0,
@@ -54,33 +58,43 @@ describe("transfer-reproducer", () => {
     const postBalanceWallet = new BN(txData.meta.postBalances[0].toString())
     const preBalanceSomePubkey = txData.meta.preBalances[1]
     const postBalanceSomePubkey = txData.meta.postBalances[1]
-    expect(postBalanceSomePubkey - preBalanceSomePubkey).eq(lamportTransfer)
-    expect(
-      preBalanceWallet
-        .sub(postBalanceWallet)
-        .eq(beforeLamports.sub(afterLamports))
-    )
-    expect(
-      beforeLamports
-        .sub(afterLamports)
-        .eq(new BN(txFee).add(new BN(lamportTransfer)))
-    )
     const feeCalculated = beforeLamports
       .sub(afterLamports)
       .sub(new BN(lamportTransfer))
-    expect(feeCalculated.eq(new BN(txFee)))
 
     console.log(
-      "feeCalculated",
-      feeCalculated.toString(),
-      "txFee",
-      txFee,
+      "test account", testAccount.toBase58(),
+      "balance", testAccountAfterLamports.toString()
+    )
+    console.log(
+      "feeCalculated", feeCalculated.toString(),
+      "txFee", txFee,
       "diff",
       beforeLamports
         .sub(afterLamports)
         .sub(new BN(lamportTransfer))
-        .sub(new BN(txFee))
+        .subn(txFee)
         .toString()
     )
+
+    expect(postBalanceSomePubkey - preBalanceSomePubkey).eq(lamportTransfer)
+    expect(preBalanceWallet.sub(postBalanceWallet).toString()).eq(
+      beforeLamports.sub(afterLamports).toString()
+    )
+    expect(beforeLamports.sub(afterLamports).toString()).eq(
+      new BN(txFee).add(new BN(lamportTransfer)).toString()
+    )
+    expect(feeCalculated.toString()).eq(new BN(txFee).toString())
+  }
+
+  it("transfer sol", async () => {
+    await testTransfer(LAMPORTS_PER_SOL)
+  })
+
+  it("strange transfer stuff", async () => {
+    // number of lamports for rent exception of 0 bytes
+    // https://docs.rs/solana-program/latest/src/solana_program/rent.rs.html#31
+    const lamportTransfer = 890880
+    await testTransfer(lamportTransfer)
   })
 })
