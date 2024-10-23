@@ -81,10 +81,10 @@ describe("transfer-reproducer", () => {
     expect(preBalanceWallet.sub(postBalanceWallet).toString()).eq(
       beforeLamports.sub(afterLamports).toString()
     )
+    expect(feeCalculated.toString()).eq(new BN(txFee).toString())
     expect(beforeLamports.sub(afterLamports).toString()).eq(
       new BN(txFee).add(new BN(lamportTransfer)).toString()
     )
-    expect(feeCalculated.toString()).eq(new BN(txFee).toString())
   }
 
   it("transfer sol", async () => {
@@ -94,7 +94,9 @@ describe("transfer-reproducer", () => {
   it("strange transfer stuff", async () => {
     // number of lamports for rent exception of 0 bytes
     // https://docs.rs/solana-program/latest/src/solana_program/rent.rs.html#31
-    const lamportTransfer = 890880
+    // const lamportTransfer = LAMPORTS_PER_SOL
+    const lamportTransfer = await provider.connection.getMinimumBalanceForRentExemption(0)
+    console.log("lamportTransfer for rent exempt 0 data", lamportTransfer)
     await testTransfer(lamportTransfer)
   })
 })

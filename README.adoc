@@ -3,6 +3,38 @@
 A reproducer of strange behaviour of transfering some amounts of SOLs
 from one account to another.
 
+== Prerequisites
+
+.1) Install the Solana toolsuite
+
+[source,sh]
+----
+sh -c "$(curl -sSfL https://release.solana.com/v1.18.18/install)"
+
+solana-test-validator --version
+> solana-test-validator 1.18.18 (src:83047136; feat:4215500110, client:SolanaLabs)
+----
+
+.2) Install anchor CLI
+
+[source,sh]
+----
+cargo install --git https://github.com/coral-xyz/anchor avm --locked --force
+
+avm install 0.30.1
+
+anchor --version
+> anchor-cli 0.30.1
+----
+
+.3) Install TypeScript project dependencies
+
+[source,sh]
+----
+yarn install
+----
+
+
 == HOWTO
 
 [source,sh]
@@ -49,7 +81,7 @@ feeCalculated 4980 txFee 5000 diff -20
 
       -895860
       +895880
-      
+
       at /home/chalda/my-testing/solana-transfer-reproducer/tests/transfer-reproducer.ts:84:58
       at Generator.next (<anonymous>)
       at fulfilled (tests/transfer-reproducer.ts:28:58)
